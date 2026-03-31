@@ -7,7 +7,8 @@ type ErrorResponseData = {
 
 const request = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001/api",
-  timeout: 10000,
+  // 线上后端使用免费实例时可能会有冷启动，适当拉长超时时间避免首次请求过早失败。
+  timeout: 30000,
 });
 
 // 统一给请求附加默认请求头和登录 token。
@@ -40,7 +41,9 @@ request.interceptors.response.use(
 
     const serverMessage = error.response?.data?.message;
     const fallbackMessage =
-      error.code === "ECONNABORTED" ? "请求超时，请稍后重试" : "请求失败，请稍后重试";
+      error.code === "ECONNABORTED"
+        ? "请求超时，服务器可能正在唤醒，请稍后重试"
+        : "请求失败，请稍后重试";
     const normalizedError = new Error(serverMessage || fallbackMessage);
 
     return Promise.reject(normalizedError);
