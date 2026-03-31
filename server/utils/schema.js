@@ -13,6 +13,24 @@ async function ensureUsersTable() {
   `);
 }
 
+// 确保事项主表存在，首次部署到空数据库时先把基础结构建出来。
+async function ensureTodosTable() {
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS todos (
+      id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NULL,
+      text VARCHAR(255) NOT NULL,
+      status VARCHAR(20) NOT NULL DEFAULT 'pending',
+      priority VARCHAR(20) NOT NULL DEFAULT 'medium',
+      tags VARCHAR(1000) NOT NULL DEFAULT '[]',
+      create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      complete_time DATETIME NULL,
+      INDEX idx_todos_user_id (user_id)
+    )
+  `);
+}
+
 // 确保事项表中存在 user_id 字段，用于按用户隔离数据。
 async function ensureTodoUserColumn() {
   const [rows] = await db.query("SHOW COLUMNS FROM todos LIKE 'user_id'");
@@ -70,7 +88,7 @@ async function ensureTodoPriorityColumn() {
   );
 }
 
-// 确保事项表中存在 tags 字段，使用 JSON 字符串存储标签数组。
+// 确保事项表中存在 tags 字段，使用 JSON 字符串保存标签数组。
 async function ensureTodoTagsColumn() {
   const [rows] = await db.query("SHOW COLUMNS FROM todos LIKE 'tags'");
 
@@ -109,7 +127,7 @@ async function normalizeTodoTagData() {
   await db.query("UPDATE todos SET tags = '[]' WHERE tags IS NULL OR tags = ''");
 }
 
-// 把历史中的“进行中”状态回收成“待处理”，让状态模型保持简单。
+// 把历史里的“进行中”状态回收成“待处理”，让状态模型保持简单。
 async function normalizeTodoStatusData() {
   await db.query("UPDATE todos SET status = 'pending' WHERE status = 'in_progress'");
 }
@@ -143,6 +161,7 @@ async function ensureTodoUserIndex() {
 // 启动服务前统一补齐项目依赖的表结构和默认数据。
 async function ensureAppSchema() {
   await ensureUsersTable();
+  await ensureTodosTable();
   await ensureTodoUserColumn();
   await ensureTodoPriorityColumn();
   await ensureTodoTagsColumn();
