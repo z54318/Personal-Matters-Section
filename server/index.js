@@ -6,6 +6,7 @@ const routes = require("./routes");
 const { ensureAppSchema } = require("./utils/schema");
 
 const app = express();
+const PORT = process.env.PORT || 3001;
 
 // 注册全局中间件，解析 JSON 并允许前端跨域访问。
 app.use(express.json());
@@ -18,8 +19,8 @@ app.use("/api", routes);
 async function startServer() {
   await ensureAppSchema();
 
-  app.listen(3001, () => {
-    console.log("Server is running on port 3001");
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
   });
 }
 
