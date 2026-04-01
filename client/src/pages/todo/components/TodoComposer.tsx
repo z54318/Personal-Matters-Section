@@ -6,7 +6,6 @@ type TodoComposerProps = {
   onSubmit: () => void;
 };
 
-// 渲染顶部新增事项输入区，支持同时录入标签。
 export function TodoComposer({
   value,
   tagValue,
@@ -15,7 +14,7 @@ export function TodoComposer({
   onSubmit,
 }: TodoComposerProps) {
   return (
-    <div className="mb-5 space-y-3">
+    <div className="mb-6 space-y-3">
       <div className="flex flex-col gap-3 sm:flex-row">
         <input
           type="text"

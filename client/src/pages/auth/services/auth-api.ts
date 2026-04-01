@@ -4,6 +4,7 @@ import type {
   AuthResponse,
   AuthUser,
   ChangePasswordPayload,
+  UpdateProfilePayload,
 } from "../model/auth.types";
 
 const AUTH_API_URL = "/auth";
@@ -27,6 +28,18 @@ export const authApi = {
   // 页面刷新后，用本地 token 拉取当前用户信息。
   getCurrentUser: async () => {
     const response = await request.get<AuthUser>(`${AUTH_API_URL}/me`);
+    return response.data;
+  },
+
+  // 获取个人中心需要展示的完整资料。
+  getProfile: async () => {
+    const response = await request.get<AuthUser>(`${AUTH_API_URL}/profile`);
+    return response.data;
+  },
+
+  // 更新个人中心中的昵称和个人简介。
+  updateProfile: async (payload: UpdateProfilePayload) => {
+    const response = await request.put<AuthUser>(`${AUTH_API_URL}/profile`, payload);
     return response.data;
   },
 

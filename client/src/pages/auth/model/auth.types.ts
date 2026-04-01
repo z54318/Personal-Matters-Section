@@ -1,6 +1,10 @@
 export type AuthUser = {
   id: number;
   username: string;
+  nickname: string;
+  bio: string;
+  create_time: string;
+  update_time: string;
 };
 
 export type AuthCredentials = {
@@ -11,6 +15,11 @@ export type AuthCredentials = {
 export type ChangePasswordPayload = {
   currentPassword: string;
   newPassword: string;
+};
+
+export type UpdateProfilePayload = {
+  nickname: string;
+  bio: string;
 };
 
 export type AuthResponse = {

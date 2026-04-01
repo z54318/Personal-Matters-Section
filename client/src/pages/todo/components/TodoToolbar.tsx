@@ -1,85 +1,106 @@
-import type { TodoFilter } from "../model/todo.types";
+import { todoFilterOptions } from "../model/todo-status";
+import type { TodoFilter, TodoSort } from "../model/todo.types";
 
 type TodoToolbarProps = {
   searchTerm: string;
   activeFilter: TodoFilter;
+  sortBy: TodoSort;
   onSearchChange: (value: string) => void;
   onSearchSubmit: () => void;
   onSearchClear: () => void;
-  onFilterChange: (value: TodoFilter) => void;
+  onFilterChange: (filter: TodoFilter) => void;
+  onSortChange: (sort: TodoSort) => void;
 };
 
-const filterOptions: Array<{ label: string; value: TodoFilter }> = [
-  { label: "全部", value: "all" },
-  { label: "待处理", value: "pending" },
-  { label: "已完成", value: "done" },
+const sortOptions: Array<{ value: TodoSort; label: string }> = [
+  { value: "updated_desc", label: "最近更新" },
+  { value: "created_desc", label: "最新创建" },
+  { value: "created_asc", label: "最早创建" },
+  { value: "priority_desc", label: "优先级优先" },
 ];
 
-// 渲染搜索框和状态筛选按钮。
 export function TodoToolbar({
   searchTerm,
   activeFilter,
+  sortBy,
   onSearchChange,
   onSearchSubmit,
   onSearchClear,
   onFilterChange,
+  onSortChange,
 }: TodoToolbarProps) {
-  const hasKeyword = searchTerm.trim().length > 0;
-
   return (
-    <div className="mb-5 flex flex-col gap-3 rounded-4 bg-slate-50/80 p-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
-        <input
-          type="text"
-          value={searchTerm}
-          onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="按事项内容或标签搜索..."
-          className="field-base h-10 max-w-full sm:w-80"
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              onSearchSubmit();
-            }
-          }}
-        />
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onSearchSubmit}
-            className="appearance-none rounded-full border-0 bg-slate-900 px-4 py-2 text-sm font-medium text-white outline-none shadow-none transition-colors duration-200 hover:bg-cyan-600"
-          >
-            搜索
-          </button>
-          {hasKeyword ? (
-            <button
-              type="button"
-              onClick={onSearchClear}
-              className="appearance-none rounded-full border-0 bg-white px-4 py-2 text-sm font-medium text-slate-500 outline-none shadow-[inset_0_0_0_1px_rgb(148,163,184)] transition-colors duration-200 hover:text-slate-700"
+    <div className="mb-6 rounded-5 bg-slate-50/90 px-4 py-4">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-1 flex-col gap-3 sm:flex-row">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(event) => onSearchChange(event.target.value)}
+              placeholder="按事项内容或标签搜索..."
+              className="field-base min-w-0 flex-1"
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  onSearchSubmit();
+                }
+              }}
+            />
+            <div className="flex gap-3">
+              <button type="button" onClick={onSearchSubmit} className="btn-primary">
+                搜索
+              </button>
+              {searchTerm ? (
+                <button
+                  type="button"
+                  onClick={onSearchClear}
+                  className="appearance-none rounded-full border-0 bg-white px-4 py-2 text-sm font-medium text-slate-500 outline-none shadow-[inset_0_0_0_1px_rgb(148,163,184)] transition-colors duration-200 hover:text-slate-700"
+                >
+                  清空
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-medium text-slate-500" htmlFor="todo-sort">
+              排序
+            </label>
+            <select
+              id="todo-sort"
+              value={sortBy}
+              onChange={(event) => onSortChange(event.target.value as TodoSort)}
+              className="appearance-none rounded-full border-0 bg-white px-4 py-2 text-sm text-slate-600 outline-none shadow-[inset_0_0_0_1px_rgb(148,163,184)]"
             >
-              清空
-            </button>
-          ) : null}
+              {sortOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
-      </div>
 
-      <div className="flex flex-wrap gap-2">
-        {filterOptions.map((option) => {
-          const isActive = activeFilter === option.value;
+        <div className="flex flex-wrap gap-3">
+          {todoFilterOptions.map((option) => {
+            const active = option.value === activeFilter;
 
-          return (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => onFilterChange(option.value)}
-              className={`appearance-none rounded-full px-4 py-2 text-sm font-medium outline-none transition-colors duration-200 ${
-                isActive
-                  ? "border-0 bg-slate-900 text-white shadow-none"
-                  : "border-0 bg-white text-slate-600 shadow-[inset_0_0_0_1px_rgb(148,163,184)] hover:text-slate-800"
-              }`}
-            >
-              {option.label}
-            </button>
-          );
-        })}
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => onFilterChange(option.value)}
+                className={
+                  active
+                    ? "btn-primary"
+                    : "appearance-none rounded-full border-0 bg-white px-4 py-2 text-sm font-medium text-slate-500 outline-none shadow-[inset_0_0_0_1px_rgb(148,163,184)] transition-colors duration-200 hover:text-slate-700"
+                }
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

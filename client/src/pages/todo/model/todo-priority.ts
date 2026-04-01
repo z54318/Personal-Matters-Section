@@ -1,48 +1,29 @@
 import type { TodoPriority } from "./todo.types";
 
-type PriorityMeta = {
-  label: string;
-  color: "crimson" | "amber" | "gray";
-};
-
-export const todoPriorityOptions: Array<{
-  value: TodoPriority;
-  label: string;
-}> = [
+export const todoPriorityOptions: Array<{ value: TodoPriority; label: string }> = [
   { value: "high", label: "高优先级" },
   { value: "medium", label: "中优先级" },
   { value: "low", label: "低优先级" },
 ];
 
-// 把后端返回的优先级值收敛成前端可识别的合法值。
-export function normalizeTodoPriority(priority?: string): TodoPriority {
-  if (priority === "high" || priority === "low") {
-    return priority;
+export function getTodoPriorityLabel(priority: TodoPriority) {
+  switch (priority) {
+    case "high":
+      return "高优先级";
+    case "low":
+      return "低优先级";
+    default:
+      return "中优先级";
   }
-
-  return "medium";
 }
 
-// 根据优先级返回展示文案和对应色板。
-export function getTodoPriorityMeta(priority?: string): PriorityMeta {
-  const normalizedPriority = normalizeTodoPriority(priority);
-
-  if (normalizedPriority === "high") {
-    return {
-      label: "高优先级",
-      color: "crimson",
-    };
+export function getTodoPriorityClasses(priority: TodoPriority) {
+  switch (priority) {
+    case "high":
+      return "bg-rose-50 text-rose-600";
+    case "low":
+      return "bg-slate-100 text-slate-500";
+    default:
+      return "bg-amber-50 text-amber-700";
   }
-
-  if (normalizedPriority === "low") {
-    return {
-      label: "低优先级",
-      color: "gray",
-    };
-  }
-
-  return {
-    label: "中优先级",
-    color: "amber",
-  };
 }

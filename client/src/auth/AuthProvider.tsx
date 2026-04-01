@@ -12,6 +12,7 @@ import {
   getAuthToken,
   getAuthUser,
   saveAuthSession,
+  saveAuthUser,
 } from "../lib/auth-storage";
 import { authApi } from "../pages/auth/services/auth-api";
 import type { AuthCredentials, AuthUser } from "../pages/auth/model/auth.types";
@@ -22,6 +23,7 @@ type AuthContextValue = {
   isInitializing: boolean;
   login: (payload: AuthCredentials) => Promise<void>;
   register: (payload: AuthCredentials) => Promise<void>;
+  syncUser: (nextUser: AuthUser) => void;
   logout: () => void;
 };
 
@@ -83,7 +85,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
   }, []);
 
-  // 监听全局登录态变化，保证拦截器清理 token 后页面也能立即同步。
+  // 监听全局登录态变化，保证拦截器清理 token 后页面也能立刻同步。
   useEffect(() => {
     const handleAuthChange = () => {
       setUser(getAuthUser());
@@ -114,6 +116,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     [applyAuthResult]
   );
 
+  // 同步当前登录用户资料，供个人中心保存后立即刷新页面头部信息。
+  const syncUser = useCallback((nextUser: AuthUser) => {
+    saveAuthUser(nextUser);
+    setUser(nextUser);
+  }, []);
+
   // 主动退出登录时，清理本地会话并回到未登录状态。
   const logout = useCallback(() => {
     clearAuthSession();
@@ -127,9 +135,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       isInitializing,
       login,
       register,
+      syncUser,
       logout,
     }),
-    [user, isInitializing, login, register, logout]
+    [user, isInitializing, login, register, syncUser, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,84 +1,53 @@
-import { Badge, DropdownMenu, Text } from "@radix-ui/themes";
-import type { Todo, TodoPriority, TodoStatus } from "../model/todo.types";
+import { DropdownMenu } from "@radix-ui/themes";
+import { formatAbsoluteDateTime } from "../../../lib/time";
 import {
-  getTodoPriorityMeta,
-  normalizeTodoPriority,
+  getTodoPriorityClasses,
+  getTodoPriorityLabel,
   todoPriorityOptions,
 } from "../model/todo-priority";
 import {
-  getTodoStatusMeta,
-  normalizeTodoStatus,
-  todoStatusOptions,
+  getTodoStatusClasses,
+  getTodoStatusLabel,
+  todoFilterOptions,
 } from "../model/todo-status";
-
-type EmptyState = {
-  title: string;
-  description: string;
-};
+import type { Todo, TodoPriority, TodoStatus } from "../model/todo.types";
 
 type TodoListProps = {
   todos: Todo[];
   editingId: number | null;
   editText: string;
-  editTagText: string;
+  editTagInput: string;
   isLoading: boolean;
   deletingTodoId: number | null;
   updatingStatusId: number | null;
   updatingPriorityId: number | null;
-  emptyState: EmptyState;
+  updatingArchiveId: number | null;
+  emptyState: string;
   onEditTextChange: (value: string) => void;
   onEditTagChange: (value: string) => void;
   onStartEdit: (todo: Todo) => void;
   onCancelEdit: () => void;
-  onSaveEdit: (id: number) => void;
+  onSaveEdit: (todoId: number) => void;
   onRequestDelete: (todo: Todo) => void;
-  onChangeStatus: (todo: Todo, status: TodoStatus) => void;
-  onChangePriority: (todo: Todo, priority: TodoPriority) => void;
+  onChangeStatus: (todoId: number, status: TodoStatus) => void;
+  onChangePriority: (todoId: number, priority: TodoPriority) => void;
+  onChangeArchived: (todo: Todo, archived: boolean) => void;
 };
 
-// 统一格式化后端返回的日期时间。
-function formatDateTime(value?: string | null) {
-  if (!value) return "";
-
-  const normalizedValue = value.includes("T") ? value : value.replace(" ", "T");
-  const parsedDate = new Date(normalizedValue);
-
-  if (Number.isNaN(parsedDate.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(parsedDate);
-}
-
-// 在首屏加载时渲染骨架，减少空白等待感。
 function TodoListSkeleton() {
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {Array.from({ length: 4 }).map((_, index) => (
         <div
           key={index}
-          className="flex items-start gap-3 rounded-4 border border-slate-200 bg-white px-4 py-3"
+          className="rounded-5 bg-slate-50/90 px-5 py-5 shadow-[inset_0_0_0_1px_rgba(226,232,240,0.9)]"
         >
-          <span className="mt-2 h-2.5 w-2.5 animate-pulse rounded-full bg-slate-200" />
-          <div className="flex-1 space-y-2">
-            <div className="h-4 w-2/5 animate-pulse rounded-full bg-slate-100" />
-            <div className="h-5 w-1/3 animate-pulse rounded-full bg-slate-100" />
-            <div className="h-3 w-2/5 animate-pulse rounded-full bg-slate-100" />
-          </div>
-          <div className="flex gap-2">
-            <div className="h-7 w-18 animate-pulse rounded-full bg-slate-100" />
-            <div className="h-7 w-18 animate-pulse rounded-full bg-slate-100" />
-          </div>
-          <div className="flex gap-2">
-            <div className="h-7 w-14 animate-pulse rounded-full bg-slate-100" />
-            <div className="h-7 w-14 animate-pulse rounded-full bg-slate-100" />
+          <div className="h-5 w-1/3 rounded-full bg-slate-200" />
+          <div className="mt-3 h-4 w-2/3 rounded-full bg-slate-100" />
+          <div className="mt-5 flex gap-3">
+            <div className="h-9 w-24 rounded-full bg-slate-100" />
+            <div className="h-9 w-24 rounded-full bg-slate-100" />
+            <div className="h-9 w-20 rounded-full bg-slate-100" />
           </div>
         </div>
       ))}
@@ -86,16 +55,97 @@ function TodoListSkeleton() {
   );
 }
 
-// 渲染事项列表、编辑态和状态/优先级切换菜单。
+function getActionBadgeClasses(baseClasses: string, disabled = false) {
+  return `inline-flex items-center rounded-full border-0 px-4 py-2 text-sm font-medium outline-none shadow-[inset_0_0_0_1px_rgba(148,163,184,0.32)] transition-all duration-200 ${
+    disabled
+      ? `${baseClasses} cursor-not-allowed opacity-55`
+      : `${baseClasses} cursor-pointer hover:-translate-y-0.5 hover:shadow-[inset_0_0_0_1px_rgba(148,163,184,0.32),0_10px_24px_rgba(15,23,42,0.08)]`
+  }`;
+}
+
+type SelectionMenuProps = {
+  currentLabel: string;
+  currentClasses: string;
+  disabled?: boolean;
+  widthClass?: string;
+  loadingLabel?: string;
+  options: Array<{
+    value: string;
+    label: string;
+    selected: boolean;
+    hoverClasses: string;
+    onSelect: () => void;
+  }>;
+};
+
+function SelectionMenu({
+  currentLabel,
+  currentClasses,
+  disabled = false,
+  widthClass = "min-w-[176px]",
+  loadingLabel,
+  options,
+}: SelectionMenuProps) {
+  if (disabled) {
+    return (
+      <button
+        type="button"
+        disabled
+        className={getActionBadgeClasses(currentClasses, true)}
+      >
+        {loadingLabel ?? currentLabel}
+      </button>
+    );
+  }
+
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger>
+        <button
+          type="button"
+          className={getActionBadgeClasses(currentClasses)}
+        >
+          {currentLabel}
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Content
+        align="end"
+        className={`${widthClass} rounded-4 border-0 bg-white/98 p-1 shadow-[0_18px_48px_rgba(15,23,42,0.16)]`}
+      >
+        {options.map((option) => (
+          <DropdownMenu.Item
+            key={option.value}
+            onSelect={option.onSelect}
+            disabled={option.selected}
+            className={`rounded-3 px-3 py-2 text-sm ${
+              option.selected
+                ? "bg-slate-100 text-slate-400"
+                : `text-slate-600 ${option.hoverClasses}`
+            }`}
+          >
+            <span className="flex w-full items-center justify-between gap-3">
+              <span>{option.label}</span>
+              {option.selected ? (
+                <span className="text-xs text-slate-400">当前</span>
+              ) : null}
+            </span>
+          </DropdownMenu.Item>
+        ))}
+      </DropdownMenu.Content>
+    </DropdownMenu.Root>
+  );
+}
+
 export function TodoList({
   todos,
   editingId,
   editText,
-  editTagText,
+  editTagInput,
   isLoading,
   deletingTodoId,
   updatingStatusId,
   updatingPriorityId,
+  updatingArchiveId,
   emptyState,
   onEditTextChange,
   onEditTagChange,
@@ -105,280 +155,189 @@ export function TodoList({
   onRequestDelete,
   onChangeStatus,
   onChangePriority,
+  onChangeArchived,
 }: TodoListProps) {
   if (isLoading && todos.length === 0) {
     return <TodoListSkeleton />;
   }
 
-  if (todos.length === 0) {
+  if (!todos.length) {
     return (
-      <div className="rounded-4 border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center">
-        <p className="m-0 text-base font-semibold text-slate-700">
-          {emptyState.title}
-        </p>
-        <p className="mt-2 text-sm leading-6 text-slate-500">
-          {emptyState.description}
-        </p>
+      <div className="rounded-5 bg-slate-50/90 px-5 py-10 text-center text-sm text-slate-500 shadow-[inset_0_0_0_1px_rgba(226,232,240,0.9)]">
+        {emptyState}
       </div>
     );
   }
 
   return (
-    <div
-      className={`transition-opacity duration-200 ${isLoading ? "opacity-70" : "opacity-100"}`}
-    >
-      <ul className="m-0 list-none space-y-3 p-0">
-        {todos.map((todo) => {
-          const tags = todo.tags ?? [];
-          const status = getTodoStatusMeta(todo, editingId);
-          const priority = getTodoPriorityMeta(todo.priority);
-          const normalizedStatus = normalizeTodoStatus(todo.status);
-          const normalizedPriority = normalizeTodoPriority(todo.priority);
-          const createTimeText = formatDateTime(todo.create_time);
-          const updateTimeText = formatDateTime(todo.update_time);
-          const completeTimeText = formatDateTime(todo.complete_time);
-          const shouldShowUpdateTime =
-            updateTimeText &&
-            updateTimeText !== createTimeText &&
-            updateTimeText !== completeTimeText;
+    <div className="space-y-4">
+      {todos.map((todo) => {
+        const isEditing = editingId === todo.id;
+        const isArchived = todo.archived;
 
-          return (
-            <li
-              key={todo.id}
-              className="group flex items-start gap-3 rounded-4 border border-slate-200 bg-white px-4 py-3 transition hover:border-cyan-300 hover:bg-cyan-50/35"
-            >
-              <span
-                className={`mt-2 h-2.5 w-2.5 rounded-full ${
-                  normalizedStatus === "done" ? "bg-emerald-500" : "bg-cyan-500"
-                }`}
-              />
+        return (
+          <article
+            key={todo.id}
+            className={`rounded-5 px-5 py-5 shadow-[inset_0_0_0_1px_rgba(226,232,240,0.9)] transition-colors duration-200 ${
+              isArchived ? "bg-slate-50/80" : "bg-white"
+            }`}
+          >
+            <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+              <div className="min-w-0 flex-1">
+                {!isEditing ? (
+                  <div className="flex items-start gap-4">
+                    <span
+                      className={`mt-2 h-4 w-4 shrink-0 rounded-full ${
+                        todo.status === "done"
+                          ? "bg-emerald-500"
+                          : isArchived
+                            ? "bg-slate-400"
+                            : "bg-cyan-500"
+                      }`}
+                    />
+                    <div className="min-w-0">
+                      <h3
+                        className={`m-0 break-all text-2xl font-700 ${
+                          isArchived ? "text-slate-400" : "text-slate-700"
+                        }`}
+                      >
+                        {todo.text}
+                      </h3>
 
-              {editingId === todo.id ? (
-                <>
-                  <div className="flex-1 space-y-2">
+                      {todo.tags.length ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {todo.tags.map((tag) => (
+                            <span
+                              key={`${todo.id}-${tag}`}
+                              className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-500 shadow-[inset_0_0_0_1px_rgba(148,163,184,0.65)]"
+                            >
+                              #{tag}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-400">
+                        <span>创建于 {formatAbsoluteDateTime(todo.create_time)}</span>
+                        <span>更新于 {formatAbsoluteDateTime(todo.update_time)}</span>
+                        {todo.complete_time ? (
+                          <span>完成于 {formatAbsoluteDateTime(todo.complete_time)}</span>
+                        ) : null}
+                        {todo.archive_time ? (
+                          <span>归档于 {formatAbsoluteDateTime(todo.archive_time)}</span>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
                     <input
                       type="text"
                       value={editText}
                       onChange={(event) => onEditTextChange(event.target.value)}
-                      className="field-base h-10 w-full px-3 py-2 text-sm"
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          onSaveEdit(todo.id);
-                        }
-
-                        if (event.key === "Escape") {
-                          onCancelEdit();
-                        }
-                      }}
+                      className="field-base"
                     />
-
                     <input
                       type="text"
-                      value={editTagText}
+                      value={editTagInput}
                       onChange={(event) => onEditTagChange(event.target.value)}
-                      placeholder="标签用逗号分隔，例如：学习, 生活"
-                      className="field-base h-10 w-full px-3 py-2 text-sm"
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          onSaveEdit(todo.id);
-                        }
-
-                        if (event.key === "Escape") {
-                          onCancelEdit();
-                        }
-                      }}
+                      placeholder="标签使用逗号分隔，例如：学习, 生活"
+                      className="field-base"
                     />
-
-                    <div className="flex flex-wrap gap-2">
-                      <Badge color={status.color} variant="soft" radius="full">
-                        {status.label}
-                      </Badge>
-                    </div>
-
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
-                      {createTimeText ? <span>创建于 {createTimeText}</span> : null}
-                      {shouldShowUpdateTime ? (
-                        <span>更新于 {updateTimeText}</span>
-                      ) : null}
-                      {completeTimeText ? (
-                        <span>完成于 {completeTimeText}</span>
-                      ) : null}
-                    </div>
-                  </div>
-
-                  <div className="flex self-center items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => onSaveEdit(todo.id)}
-                      className="appearance-none rounded-full border-0 bg-slate-900 px-3 py-1 text-xs font-medium text-white outline-none shadow-none transition-colors duration-200 hover:bg-cyan-600"
-                    >
-                      保存
-                    </button>
-                    <button
-                      type="button"
-                      onClick={onCancelEdit}
-                      className="appearance-none rounded-full border-0 bg-white px-3 py-1 text-xs font-medium text-slate-500 outline-none shadow-[inset_0_0_0_1px_rgb(100,116,139)] transition-colors duration-200 hover:bg-white hover:text-slate-700"
-                    >
-                      取消
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="min-w-0 flex-1 space-y-2">
-                    <div
-                      className={`truncate text-[15px] ${
-                        normalizedStatus === "done"
-                          ? "text-slate-400"
-                          : "text-slate-700"
-                      }`}
-                    >
-                      {todo.text}
-                    </div>
-
-                    {tags.length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        {tags.map((tag) => (
-                          <Badge
-                            key={`${todo.id}-${tag}`}
-                            color="gray"
-                            variant="surface"
-                            radius="full"
-                          >
-                            #{tag}
-                          </Badge>
-                        ))}
-                      </div>
-                    ) : null}
-
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
-                      {createTimeText ? <span>创建于 {createTimeText}</span> : null}
-                      {shouldShowUpdateTime ? (
-                        <span>更新于 {updateTimeText}</span>
-                      ) : null}
-                      {completeTimeText ? (
-                        <span>完成于 {completeTimeText}</span>
-                      ) : null}
-                    </div>
-                  </div>
-
-                  <div className="flex self-center items-center gap-2">
-                    <DropdownMenu.Root>
-                      <DropdownMenu.Trigger>
-                        <button
-                          type="button"
-                          disabled={updatingPriorityId === todo.id}
-                          className="appearance-none inline-flex items-center gap-1 rounded-full border-0 bg-transparent p-0 outline-none shadow-none disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          <Badge
-                            color={priority.color}
-                            variant="soft"
-                            radius="full"
-                            className="shrink-0 cursor-pointer"
-                          >
-                            {updatingPriorityId === todo.id ? "更新中..." : priority.label}
-                          </Badge>
-                        </button>
-                      </DropdownMenu.Trigger>
-                      <DropdownMenu.Content
-                        align="center"
-                        sideOffset={10}
-                        className="min-w-36 rounded-4 border-0 bg-white/98 p-1 shadow-[0_18px_40px_rgba(15,23,42,0.14)]"
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={() => onSaveEdit(todo.id)}
+                        className="btn-primary"
                       >
-                        {todoPriorityOptions.map((option) => {
-                          const isCurrent = normalizedPriority === option.value;
-
-                          return (
-                            <DropdownMenu.Item
-                              key={option.value}
-                              disabled={isCurrent || updatingPriorityId === todo.id}
-                              onSelect={() => onChangePriority(todo, option.value)}
-                              className="rounded-3 px-3 py-2 text-sm text-slate-700 outline-none data-[highlighted]:bg-cyan-50 data-[highlighted]:text-slate-900 data-[disabled]:opacity-50"
-                            >
-                              <div className="flex w-full items-center justify-between gap-3">
-                                <Text as="span" size="2">
-                                  {option.label}
-                                </Text>
-                                {isCurrent ? (
-                                  <span className="text-xs text-slate-400">当前</span>
-                                ) : null}
-                              </div>
-                            </DropdownMenu.Item>
-                          );
-                        })}
-                      </DropdownMenu.Content>
-                    </DropdownMenu.Root>
-
-                    <DropdownMenu.Root>
-                      <DropdownMenu.Trigger>
-                        <button
-                          type="button"
-                          disabled={updatingStatusId === todo.id}
-                          className="appearance-none inline-flex items-center gap-1 rounded-full border-0 bg-transparent p-0 outline-none shadow-none disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          <Badge
-                            color={status.color}
-                            variant="soft"
-                            radius="full"
-                            className="shrink-0 cursor-pointer"
-                          >
-                            {updatingStatusId === todo.id ? "更新中..." : status.label}
-                          </Badge>
-                        </button>
-                      </DropdownMenu.Trigger>
-                      <DropdownMenu.Content
-                        align="center"
-                        sideOffset={10}
-                        className="min-w-36 rounded-4 border-0 bg-white/98 p-1 shadow-[0_18px_40px_rgba(15,23,42,0.14)]"
+                        保存
+                      </button>
+                      <button
+                        type="button"
+                        onClick={onCancelEdit}
+                        className="appearance-none rounded-full border-0 bg-white px-4 py-2 text-sm font-medium text-slate-500 outline-none shadow-[inset_0_0_0_1px_rgb(148,163,184)] transition-colors duration-200 hover:text-slate-700"
                       >
-                        {todoStatusOptions.map((option) => {
-                          const isCurrent = normalizedStatus === option.value;
-
-                          return (
-                            <DropdownMenu.Item
-                              key={option.value}
-                              disabled={isCurrent || updatingStatusId === todo.id}
-                              onSelect={() => onChangeStatus(todo, option.value)}
-                              className="rounded-3 px-3 py-2 text-sm text-slate-700 outline-none data-[highlighted]:bg-cyan-50 data-[highlighted]:text-slate-900 data-[disabled]:opacity-50"
-                            >
-                              <div className="flex w-full items-center justify-between gap-3">
-                                <Text as="span" size="2">
-                                  {option.label}
-                                </Text>
-                                {isCurrent ? (
-                                  <span className="text-xs text-slate-400">当前</span>
-                                ) : null}
-                              </div>
-                            </DropdownMenu.Item>
-                          );
-                        })}
-                      </DropdownMenu.Content>
-                    </DropdownMenu.Root>
+                        取消
+                      </button>
+                    </div>
                   </div>
+                )}
+              </div>
 
-                  <div className="flex self-center items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => onStartEdit(todo)}
-                      className="appearance-none rounded-full border-0 bg-white px-3 py-1 text-xs font-medium tracking-wide text-slate-600 outline-none shadow-[inset_0_0_0_1px_rgb(100,116,139)] transition-colors duration-200 hover:bg-white hover:text-slate-800"
-                    >
-                      编辑
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onRequestDelete(todo)}
-                      disabled={deletingTodoId === todo.id}
-                      className="appearance-none rounded-full border-0 bg-white px-3 py-1 text-xs font-medium tracking-wide text-rose-500 outline-none shadow-[inset_0_0_0_1px_rgb(100,116,139)] transition-colors duration-200 hover:bg-white hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {deletingTodoId === todo.id ? "删除中..." : "删除"}
-                    </button>
-                  </div>
-                </>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+              <div className="flex flex-wrap items-center gap-3 xl:max-w-[520px] xl:justify-end">
+                <SelectionMenu
+                  currentLabel={
+                    updatingPriorityId === todo.id
+                      ? "处理中..."
+                      : getTodoPriorityLabel(todo.priority)
+                  }
+                  currentClasses={getTodoPriorityClasses(todo.priority)}
+                  disabled={updatingPriorityId === todo.id}
+                  options={todoPriorityOptions.map((option) => ({
+                    value: option.value,
+                    label: option.label,
+                    selected: option.value === todo.priority,
+                    hoverClasses: "hover:bg-amber-50 hover:text-amber-700",
+                    onSelect: () => onChangePriority(todo.id, option.value),
+                  }))}
+                />
+
+                <SelectionMenu
+                  currentLabel={
+                    updatingStatusId === todo.id
+                      ? "处理中..."
+                      : getTodoStatusLabel(todo.status)
+                  }
+                  currentClasses={getTodoStatusClasses(todo.status)}
+                  disabled={updatingStatusId === todo.id || isArchived}
+                  options={todoFilterOptions
+                    .filter((option) => option.value === "pending" || option.value === "done")
+                    .map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                      selected: option.value === todo.status,
+                      hoverClasses: "hover:bg-cyan-50 hover:text-cyan-700",
+                      onSelect: () => onChangeStatus(todo.id, option.value as TodoStatus),
+                    }))}
+                />
+
+                <button
+                  type="button"
+                  onClick={() => onChangeArchived(todo, !isArchived)}
+                  disabled={updatingArchiveId === todo.id}
+                  className="appearance-none rounded-full border-0 bg-white px-4 py-2 text-sm font-medium text-slate-500 outline-none shadow-[inset_0_0_0_1px_rgb(148,163,184)] transition-colors duration-200 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {updatingArchiveId === todo.id
+                    ? "处理中..."
+                    : isArchived
+                      ? "恢复"
+                      : "归档"}
+                </button>
+
+                {!isEditing ? (
+                  <button
+                    type="button"
+                    onClick={() => onStartEdit(todo)}
+                    disabled={isArchived}
+                    className="appearance-none rounded-full border-0 bg-white px-4 py-2 text-sm font-medium text-slate-500 outline-none shadow-[inset_0_0_0_1px_rgb(148,163,184)] transition-colors duration-200 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    编辑
+                  </button>
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={() => onRequestDelete(todo)}
+                  disabled={deletingTodoId === todo.id}
+                  className="appearance-none rounded-full border-0 bg-white px-4 py-2 text-sm font-medium text-rose-500 outline-none shadow-[inset_0_0_0_1px_rgb(148,163,184)] transition-colors duration-200 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {deletingTodoId === todo.id ? "删除中..." : "删除"}
+                </button>
+              </div>
+            </div>
+          </article>
+        );
+      })}
     </div>
   );
 }

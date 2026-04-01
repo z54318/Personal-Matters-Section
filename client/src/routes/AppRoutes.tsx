@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
 import { ChangePasswordPage, LoginPage, RegisterPage } from "../pages/auth";
+import { ProfilePage } from "../pages/profile";
 import { TodoPage } from "../pages/todo";
 import { GuestRoute, ProtectedRoute } from "./RouteGuards";
 
@@ -25,6 +26,7 @@ export function AppRoutes() {
       </Route>
       <Route element={<ProtectedRoute />}>
         <Route path="/todos" element={<TodoPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
         <Route path="/change-password" element={<ChangePasswordPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
